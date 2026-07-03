@@ -1,9 +1,10 @@
 from playwright.sync_api import sync_playwright
+import os
 
 BASE_URL = "https://agentdev.keepme.ai"
 
 PAGES = [
-     "/clients",
+    "/clients",
     "/accounting",
     "/audit",
     "/workspace",
@@ -28,24 +29,59 @@ PAGES = [
     "/tickets"
 ]
 
+EMAIL = os.getenv("KEEPME_EMAIL")
+PASSWORD = os.getenv("KEEPME_PASSWORD")
+
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=True)
     page = browser.new_page()
 
-    # Placeholder login
-    page.goto(f"{BASE_URL}/login")
+    os.makedirs("screenshots/pass", exist_ok=True)
 
-    page.locator("input[type=email]").fill("kushalniraula41@gmail.com")
-    page.locator("input[type=password]").fill("P-)SOmL!iu_9Pm!&n6")
-    page.locator("button[type=submit]").click()
+    # IMPORTANT: same as Selenium flow → login at /clients
+    page.goto(BASE_URL + "/clients")
 
-    page.wait_for_load_state("networkidle")
+    try:
+        # EMAIL
+        page.wait_for_selector('input', timeout=15000)
+        page.locator('xpath=//*[@id="root"]/div[1]/div/div/div/form/div[1]/input').fill(EMAIL)
 
+        page.locator('xpath=//*[@id="root"]/div[1]/div/div/div/form/div[2]/button').click()
+
+        # PASSWORD
+        page.wait_for_selector('input', timeout=15000)
+        page.locator('xpath=//*[@id="root"]/div[1]/div/div/div/form/div[1]/div/input').fill(PASSWORD)
+
+        page.locator('xpath=//*[@id="root"]/div[1]/div/div/div/form/div[3]/button').click()
+
+        page.wait_for_load_state("networkidle")
+
+        print("LOGIN SUCCESS")
+
+    except Exception as e:
+        page.screenshot(path="screenshots/login_fail.png")
+        print("LOGIN FAILED:", e)
+        browser.close()
+        exit()
+
+    # -------------------------
+    # PAGE LOOP
+    # -------------------------
     for path in PAGES:
         url = BASE_URL + path
-        page.goto(url)
-        page.wait_for_load_state("networkidle")
-        page.screenshot(path=f"screenshots/{path.strip('/')}.png", full_page=True)
-        print(f"PASS - {path}")
+        print("Opening:", url)
+
+        try:
+            page.goto(url)
+            page.wait_for_load_state("networkidle")
+
+            name = path.strip("/").replace("/", "_")
+            page.screenshot(path=f"screenshots/pass/{name}.png", full_page=True)
+
+            print("PASS:", path)
+
+        except Exception as e:
+            page.screenshot(path=f"screenshots/pass/{name}_fail.png", full_page=True)
+            print("FAIL:", path, e)
 
     browser.close()
